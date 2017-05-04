@@ -14,3 +14,13 @@
 ### 1.1.2 异常情况下的生命周期分析 ###
 #### 1.1.2.1 资源相关的系统配置发生改变导致 Activity 被杀死并重新创建
 当系统配置发生改变后，Activity 会被销毁，其 onPause 、 onStop 、 onDestroy 均会被调用，同时由于 Activity 是在异常情况下终止的，系统会调用 onSaveInstanceState 来保存当前 Activity 的状态。这个方法的调用时机是在 onStop 之前，它和 onPause 没有既定的时序关系，可能在 onPause 之前，也可能在 onPause 之后。该方法只会在 Activity 被异常销毁时才会被调用，正常情况下不会调用该方法。当 Activity 被重新创建后，系统会调用 onRestoreInstanceState ，并且把 Activity 销毁时 onSaveInstanceState 方法所保存的 Bundle 对象作为参数同时传递给 onRestoreInstanceState 方法和 OnCreate 方法。因此，我们可以通过 onRestoreInstanceState 方法和 OnCreate 方法判断 Activity 是否被重建了，进而恢复之前保存的数据，从时序上讲 onRestoreInstanceState 的调用时机在 onStart 之后。
+同时，在 onSaveInstanceState 和 onRestoreInstanceState 方法中，系统已经自动为我们恢复了一些数据，如：用户输入的数据、 ListView 滚动的位置等，有关具体哪些信息被系统自动恢复，可以查看相应 View 的 onSaveInstanceState 和 onRestoreInstanceState 方法的具体实现。
+#### 1.1.2.2 资源内存不足导致低优先级的 Activity 被杀死 ####
+比较难模拟内存不足的情况，Activity 的优先级一般为下面三种：
+
+1. 前台 Activity ，和用户交互的 Activity 优先级最高；
+2. 可见非前台 Activity ，如弹出个 Dialog ，无法与用户交互；
+3. 后台 Activity ，已经被暂停的 Activity ，如执行了 onStop ，优先级最低；
+
+当系统内存不足时，系统会按照上述优先级去杀死目标 Activity 所在的进程，并在后续通过 onSaveInstanceState 和 onRestoreInstanceState 来保存和恢复数据；如果一个进程中没有四大组件在运行，那么这个进程很容易被杀死。
+## 1.2 Activity 的启动模式 ##
