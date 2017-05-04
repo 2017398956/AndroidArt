@@ -24,3 +24,6 @@
 
 当系统内存不足时，系统会按照上述优先级去杀死目标 Activity 所在的进程，并在后续通过 onSaveInstanceState 和 onRestoreInstanceState 来保存和恢复数据；如果一个进程中没有四大组件在运行，那么这个进程很容易被杀死。
 ## 1.2 Activity 的启动模式 ##
+1. stabdard : 标准模式，即系统默认模式，每次启动 Activity 时都会重新创建一个该 Activity 的实例，无论之前是否创建过。 Activity 只能在任务栈中创建，由于 ApplicationContext 不在任务栈中，所以当我们直接用 ApplicationContext 启动一个 Activity 时，总是会报异常，此时需要为待启动的 Activity 指定 FLAG_ACTIVITY_NEW_TASK 标记位，这样启动的时候就会为它创建一个任务栈，当任务栈中没有 Activity 时，系统就会回收任务栈，通过这种方式启动的 Activity 其启动模式为 singleTask ；（在该任务栈多次启动该 Activity 试试？）
+2. singleTop : 栈顶复用模式，如果新 Activity 已经位于任务栈的栈顶，那么此时 Activity 不会重新被创建，同时它的 onNewIntent 方法会被调用，通过此方法的参数我们可以取出当前的请求信息。
+3. singleTask : 栈内复用模式，如果栈内已有该 Activity 的实例，那么系统会将该 Activity 放到栈顶，并调用它的 onNewIntent 方法，通过此方法的参数我们可以取出当前的请求信息。
