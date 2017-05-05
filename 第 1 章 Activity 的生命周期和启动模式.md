@@ -24,6 +24,39 @@
 
 当系统内存不足时，系统会按照上述优先级去杀死目标 Activity 所在的进程，并在后续通过 onSaveInstanceState 和 onRestoreInstanceState 来保存和恢复数据；如果一个进程中没有四大组件在运行，那么这个进程很容易被杀死。
 ## 1.2 Activity 的启动模式 ##
-1. stabdard : 标准模式，即系统默认模式，每次启动 Activity 时都会重新创建一个该 Activity 的实例，无论之前是否创建过。 Activity 只能在任务栈中创建，由于 ApplicationContext 不在任务栈中，所以当我们直接用 ApplicationContext 启动一个 Activity 时，总是会报异常，此时需要为待启动的 Activity 指定 FLAG_ACTIVITY_NEW_TASK 标记位，这样启动的时候就会为它创建一个任务栈，当任务栈中没有 Activity 时，系统就会回收任务栈，通过这种方式启动的 Activity 其启动模式为 singleTask ；（在该任务栈多次启动该 Activity 试试？）
-2. singleTop : 栈顶复用模式，如果新 Activity 已经位于任务栈的栈顶，那么此时 Activity 不会重新被创建，同时它的 onNewIntent 方法会被调用，通过此方法的参数我们可以取出当前的请求信息。
-3. singleTask : 栈内复用模式，如果栈内已有该 Activity 的实例，那么系统会将该 Activity 放到栈顶，并调用它的 onNewIntent 方法，通过此方法的参数我们可以取出当前的请求信息。
+1. stabdard : 标准模式。即系统默认模式，每次启动 Activity 时都会重新创建一个该 Activity 的实例，无论之前是否创建过。 Activity 只能在任务栈中创建，由于 ApplicationContext 不在任务栈中，所以当我们直接用 ApplicationContext 启动一个 Activity 时，总是会报异常，此时需要为待启动的 Activity 指定 FLAG_ACTIVITY_NEW_TASK 标记位，这样启动的时候就会为它创建一个任务栈，当任务栈中没有 Activity 时，系统就会回收任务栈，通过这种方式启动的 Activity 其启动模式为 singleTask ；（在该任务栈多次启动该 Activity 试试？）
+2. singleTop : 栈顶复用模式。如果新 Activity 已经位于任务栈的栈顶，那么此时 Activity 不会重新被创建，同时它的 onNewIntent 方法会被调用，通过此方法的参数我们可以取出当前的请求信息。
+3. singleTask : 栈内复用模式。如果任一栈内已有该 Activity 的实例，那么系统会将该 Activity 放到栈顶（即，移除该栈中此 Activity 上所有的 Activity，如栈内有 ADBC 四个 Activity ，当再次启动 Activity D 时，BC 都会出栈，此时 BC 的生命周期？ ），并调用它的 onNewIntent 方法，通过此方法的参数我们可以取出当前的请求信息。
+4. singleInstance ： 单实例模式。这是一种加强的 singleTask 模式，具备 singleTask 的所有特性，另外此模式的 Activity 只能单独位于一个任务栈中。（此 Activity 再启动其他 Activity ，这两个 Activity 不在一个栈中？）
+
+配置 Activity 的启动模式一般有一下两个方法：
+
+1.通过 AndroidManifest.xml 为 Activity 指定启动模式；
+
+    <activity
+		...
+		android:launchMode="singleTask"
+		...
+	/>
+
+2.通过在 Intent 中设置标志位来为 Activity 指定启动模式；
+
+	Intent intent = new Intent() ;
+	intent.setClass(xx , xxx.class) ;
+	intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK) ;
+	startActivity(intent) ;
+
+上面两种方式都可以为 Activity 指定启动方式，但是二者之间还是有区别的。首先，优先级上，第二种启动方式的优先级要高于第一种，即两种指定都存在时，以第二种方式为准；其次，在限定范围上不同，例如，第一种无法为 Activity 设定 FLAG_ACTIVITY_CLEAR_TOP 标识，而第二种无法为 Activity 指定 singleInstance 模式。
+
+**备注** adb shell dumpsys activity 命令可以查看 Activity 启动的相关信息。
+
+### 1.3 任务栈相关参数 TaskAffinity ###
+TaskAffinity 可以翻译为“任务相关性”，这个参数标示了一个 Activity 所需的任务栈名称，默认情况下，所有 Activity 的任务栈名都为应用包名；当然，我们也可以为每个 Activity 单独指定 TaskAffinity 属性，如果该属性值与应用包名一样，就相当于没有指定，TaskAffinity 主要和 singleTask 启动模式或者 allowTaskReparenting 属性配对使用，在其他情况下没意义。另外，任务栈为前台任务栈和后台任务栈，后台任务栈中的 Activity 处于暂停状态，用户可以通过切换将后台任务栈再次调到前台。
+
+当 TaskAffinity 和 singleTask启动模式配合使用时，该 Activity 会运行在名字和 TaskAffinity 相同的任务栈中。
+
+当 TaskAffinity 和 allowTaskReparenting 结合的时候，若应用 A 启动了一个应用 B 中的某个 Activity C 后，如果 Activity C的 allowTaskReparenting 属性为 true ， 那么当应用 B 被启动后，此 Activity 会直接从应用 A 的任务栈转移到应用 B 的任务栈中；此时点击 Home 键回到桌面，点击应用 B 的桌面图标，这是不是启动应用 B 的主 Activity ，而是从新显示了被应用 A 启动的 Activity C ，或者说 C 中 A 的任务栈转移到了 B 的任务栈中。
+
+### 1.4 Activity 的 Flags ###
+Activity 的 Flags 比较多，这里不一一介绍，要注意的是：有些 Flag 是系统内部使用的，应用程序不需要手动去设置这些 Flag ，以防出现问题。
+### 1.5 IntentFilter 的匹配规则 ###
