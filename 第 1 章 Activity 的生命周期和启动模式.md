@@ -60,3 +60,71 @@ TaskAffinity 可以翻译为“任务相关性”，这个参数标示了一个 
 ### 1.4 Activity 的 Flags ###
 Activity 的 Flags 比较多，这里不一一介绍，要注意的是：有些 Flag 是系统内部使用的，应用程序不需要手动去设置这些 Flag ，以防出现问题。
 ### 1.5 IntentFilter 的匹配规则 ###
+启动 Activity 分为两种：显示调用和隐式调用。显示调用需要明确地指定被启动对象的信息，包括包名和类名；隐式调用需要明确指定组件信息。原则上一个 Intent 不应该既是显示调用又是隐式调用，如果二者共存，以显示调用为准（？待看源码）。显示调用比较简单，这里主要介绍一下隐式调用，隐式调用需要 Intent 能够匹配目标组件的 IntentFilter 中所设置的过滤信息，若不匹配则无法启动目标 Activity 。 IntentFilter 中的过滤信息有 action 、 category 、 data ， 只有一个 Activity 同时匹配 action 、 category 、 data 才算完全匹配，只有完全匹配才能成功启动目标 Activity ；另外，一个 Activity 中可以有多组 IntentFilter ，只要 Intent 可以匹配任何一组 IntentFilter ，都可以成功启动该 Activity 。 
+#### 1.5.1 action 的匹配规则 ####
+action 是一个字符串，当 Intent 中的 action 和 IntentFilter 中的 action 完全一样（包括大小写）时，才算匹配成功。
+#### 1.5.2 category 的匹配规则 ####
+category 也是一个字符串，Intent 可以没有 category ，此时系统会默认给 Intent 添加 “android.intent.category.DEFAULT”  这个 category ，如果为 Intent 指定了 category ，那么不管为 Intent 设置了多少个 category 都要能够和 IntentFilter 中的任何一个 category 相同。（多个 category ，多组 IntentFilter ？）
+#### 1.5.3 data 的匹配规则 ####
+data 的语法格式如下：
+
+	<data
+		android:scheme="string"
+		android:host="string"
+		android:port="80"
+		// 注意：下面的三个 path 都要以 “/” 开始，否则 AndroidManifest.xml 会提示错误
+		android:path="/string"
+		android:pathPattern="string"
+		android:pathPrefix="/string"
+		android:mimeType="string"
+
+        // api 19 and higher 
+		android:ssp="string"
+		android:sspPattern="string"
+		android:sspPrefix="string"
+        >
+	</data>
+
+data 由两部分组成 mimeType 和 URI ，mimeType 是指媒体类型，如 image/jpeg ， video/mp4 等； URI 的结构如下：
+
+	<scheme>://<host>:<port>[<path>|<pathPattern>|<pathPrefix>]
+
+如果 URI 中没有指定 scheme 和 host ，那么这个 URI 是无效的。path 、 pathPattern 和 pathPrefix ： path 表示完整的路径信息；pathPattern 也表示完整的路径信息，但是他里面可以包含通配符 “\*” ， “\*” 表示 0 个或多个任意字符，需要注意的是，由于正则表达式的规范，如果想表示真实的字符串，那么 “*” 要写成 “\\\\\*” (P31 书上是 2 个反斜杠，一个星) ， “\” 要写成 “\\\\\\\” （书上是 4 个反斜杠）（这里需要验证，是不是书稿 MD 样式被直接印刷了）；
+data 匹配和 action 类似，也需要完全匹配，下面分两种情况介绍下 data 的匹配规则：
+
+1.只有 mimeType
+
+	<data android:mimeType="image/*" />
+
+这种情况下虽然没有指定 URI ，但却有默认值，URI 的默认值为 content 和 file 。也就是说 data 使用默认值的时候，Intent 中的 URI 部分必须为 content 或 file 才能匹配成功。另外，如果要为 Intent 指定完整的 data ，必须要调用 setDataAndType 方法，不能先调用 setData 和 setType 中的任何一个，再调用另一个，因为 setData 和 setType 会彼此情况对方的值。
+
+2.完整的 data 格式
+这种和上面的 “data 语法格式” 内容一样，信息比较全，需要完全匹配。
+
+
+**注意：**关于 AndroidManifest.xml 中 data 的书写格式有种特殊情况，下面的两种写法是等效的：
+
+	<intent-filter ...>
+		<data android:scheme="file" android:host="www.baidu.com" />
+		...
+	</intent-filter>
+
+
+	<intent-filter ...>
+		<data android:scheme="file" />
+		<data android:host="www.baidu.com" />
+		...
+	</intent-filter>
+
+**最后**，当我们隐式启动一个 Activity 的时候，需要先判断一下是否能够找到能够匹配我们 Intent 的 Activity ，否则会报 ActivityNotFoundException 异常。判断方法可以使用 PackageManager 的 resolveActivity 或 Intent 的 resolveActivity ，如果它们找不到匹配的 Activity 则返回 null ，这样我们可以规避上述异常。另外，PackageManager 还提供了 queryIntentActivities ，这个方法不是返回最佳匹配的 Activity 信息，而是返回所有成功匹配的 Activity 信息。 下面让我们看一下这两个方法原型：
+
+	public abstract List<ResolveInfo> queryIntentActivities(Intent intent , int flag) ;
+
+	public abstract ResolveInfo resolveActivity(Intent intent , int flag) ;
+
+上面两个方法的第一个参数好理解，第二个参数需要注意，我们要使用 MATCH_DEFAULT_ONLY 这个标记位，这个标记位的含义是仅仅匹配那些在 intent-filter 中声明了 <category android:name="android.intent.category.DEFAULT" /> 这个 category 的 Activity 。使用这个标记位的意义在于，只有上述两个方法不返回 null ，那么 startActivity 一定可以成功。如果不使用这个标记位，就可以把 intent-filter 中 category 不含 DEFAULT 的那些 Activity 给匹配出来，从而导致 startActivity 可能失败。因为不含 DEFAULT 这个 category 的 Activity 是无法接收隐式 Intent 的。在 action 和 category 中，有一类 action 和 category 比较重要，它们是：
+	
+	<action android:name="android.intent.action.MAIN" />
+	<category android:name="android.intent.category.LAUNCHER" />
+
+这二者共同作用是用来标明这是一个入口 Activity 并且会出现在系统的应用列表中，少了任何一个都没意义，也无法出现在系统应用列表中。另外，针对 Service 和 BroadcastReceive ， PackageManager 同样提供了类似的方法去获取成功匹配的组件信息。
