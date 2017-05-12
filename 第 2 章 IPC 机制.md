@@ -61,3 +61,60 @@ Android 会为每一个应用分配一个唯一的 shareUID ，只有 shareUID �
 
 ### 2.3.3 Binder ###
 直观来说，Binder 是 Android 中的一个类，它实现了 IBinder 接口。从 IPC 角度来说，Binder 是 Android 中的一种跨进程通信方式，Binder 还可以理解为一种虚拟的物理设备，它的设备驱动是 /dev/binder ，该通信方式在 Linux 中没有；从 Android FrameWork 角度来说，Binder 是 ServiceManager 连接各种 Manager（ActivityManager 、 WindowManager，等等）和 ManagerService 的桥梁；从 Android 应用层来说，Binder 是客户端和服务端进行通信的媒介，当 bindService 的时候，服务端会返回一个包含了服务端业务调用的 Binder 对象，通过这个 Binder 对象，客户端就可以获取服务端提供的服务或者数据，这里的服务包括普通服务和基于 AIDL 的服务。
+
+在 Android 开发中，Binder 主要用在 Service 中，包括 AIDL 和 Messenger ，其中普通Service 中的 Binder 不涉及进程间通信，所以较为简单，无法触及 Binder 核心，而 Messenger 的底层其实是 AIDL ，所以可以选择用 AIDL 来分析 Binder 的工作机制。
+
+所有可在 Binder 中传输的接口都需要继承 IInterface 接口； AIDL 对应的类（这里记为 A ）会为每个方法声明一个唯一的整型 id 用于标识这些方法，以便在 tranact 过程中区分客户端请求了那个方法； A 中还有一个内部类 Stub ，这个 Stub 就是一个 Binder 类，当客户端和服务端都位于一个进程时，方法调用不会走跨进程的 transact 过程，而当两者位于不同进程时，方法调用需走 transact 过程，这个逻辑是由 Stub 的内部代理类 Proxy 来完成；下面将介绍 Stub 和 Proxy 中一些参数和方法的意义。
+
+**DESCRIPTOR**
+
+Binder 的唯一标识，一般用当前 Binder 的类名表示。
+
+**asInterface(android.os.IBinder obj)**
+
+用于将服务端的 Binder 对象转换为客户端所需的 AIDL 接口类型的对象，这种转换过程是区分进程的，若两者在同一进程，那么此方法返回的就是服务端的 Stub 对象本事，否则返回的是系统封装后的 Stub.proxy 对象。
+
+**asBinder**
+
+返回当前 Binder 对象。
+
+**onTransact**
+
+此方法运行在服务端中的 Binder 线程池中，当客户端发起跨进程请求时，远程请求会通过系统底层封装后交由此方法来处理。该方法的原形为：
+	
+	public boolean onTransact(int code, android.os.Parcel data, 
+										android.os.Parcel reply, int flags)
+
+服务端可以通过 code （即对应上面类 A 中方法的 id）来确定客户端请求的方法时什么，接着从 data 中取出目标方法所需的参数（如果目标方法有参数的话），然后执行目标方法，当目标方法执行完毕后，就向 reply 写入返回值（如果此方法有返回值的话），到此 onTransact 方法执行完毕。需要注意的是此方法的返回值是 boolean ，那么当客户端请求失败时，就会返回 false ，因此我们可以利用这个特性做权限验证，毕竟我们也不希望随便一个进程都能远程调用我们的服务。
+
+**Proxy#methodXXX(...)**
+
+这些方法都运行在客户端，当客户端远程调用时，它们内部实现是这样的：创建该方法所需的输入型 Parcel 对象 _data 、输出型 Parcel 对象 _reply 和返回值对象，然后把该方法的参数信息写入 _data 中（如果有参数的话）；接着调用 transact 方法来发起 RPC（远程过程调用）请求，同时当前线程挂起；然后服务端的 onTransact 方法会被调用，直到 RPC 过程返回后，当前线程继续执行，并从 _reply 中取出 RPC 过程的返回结果（如果有返回值的话），最后返回 _reply 中的数据。
+
+**注意**
+
+1. 当客户端发起远程请求时，由于当前线程会被挂起直到服务端进程返回数据，所以如果一个远程方法是很耗时的，那么不能再 UI 线程中发起此远程请求；
+2. 由于服务端的 Binder 方法运行在 Binder 线程池中，所以 Binder 方法不管是否耗时都应该采用同步的方式实现，因为它已经运行在一个线程中了。
+3. 由于 Binder 运行在服务端进程中，如果服务端进程由于某种原因异常终止，这个时候我们到服务端的 Binder 连接断裂（称之为 Binder 死亡），会导致我们的远程调用失败。更为关键的是，如果我们不知道 Binder 连接已经断裂，那么客户端的功能将受影响，为了解决这个问题，Binder 提供了两个配对的方法 linkToDeath 和 unlinkToDeath ，通过 linkToDeath 我们可以为 Binder 设置一个死亡代理，当 Binder 死亡时，我们就会收到通知，这时候我们就可以重新发起连接请求从而恢复连接，关于如何使用暂时不做介绍；另外，我们也可以通过 Binder.isBinderAlive 判读 Binder 是否死亡。
+
+## 2.4 Android 中的 IPC 方式 ##
+
+### 2.4.1 使用 Bundle ###
+四大组件中的三大组件（Activity 、 Service 、 Receiver） 都是支持在 Intent 中传递 Bundle 数据的，由于 Bundle 实现了 Parcelable 接口，所以它可以方便地在不同进程中传递数据。
+### 2.4.2 使用文件共享 ###
+文件共享方式适合在对数据同步要求不高的进程之间进行通信，并且要妥善处理并发读/写的问题。另外，SharedPreference 也是一种文件共享的方式，虽然系统为它的读/写提供了一定缓存策略，但当面对高并发或多进程时，也有很大几率会丢失数据，因此不建议在多进程中对其操作。
+### 2.4.3 使用 Messenger ###
+
+Messager 可以翻译为信使，他可以在不同的进程中传递 Message 对象，在 Message 中放入我们需要传递的数据，就可以轻松实现进程间数据传递。Messenger 是一种轻量级的 IPC 解决方案，它的底层实现是 AIDL。另外，由于 Messenger 每次只处理一个请求，不存在并发情形，因此在服务端我们不需要考虑同步问题。
+未完待续
+
+### 2.4.4 使用 AIDL ###
+由于 Messenger 是以串行方式来处理客户端消息的，所以当有大量客户端请求时，Messenger 就不合适了；同时，Messenger 的主要作用是传递消息，很多时候我们需要跨进程调用服务器方法，此时 Messenger 也无法做到，因此我们需要使用其他方式来处理这种复杂的情况，而 AIDL 就是其中一种。
+在 AIDL 中不是所有的数据类型都可以使用的，其使用规则如下：
+
+1. 基本数据类型（int 、 long 、 char 、 boolean 、 double 等）；
+2. String 和 CharSequence ；
+3. List ： 只支持 ArrayList ，且里面的元素都被 AIDL 支持 ；
+4. Map ： 只支持 HashMap ， 且里面的元素都被 AIDL 支持 ；
+5. Parcelable ： 所有实现了 Parcelable 接口的对象；
+6. AIDL ： 所有的 AIDL 接口本身也可以在 AIDL 文件中使用；
