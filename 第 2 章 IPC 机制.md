@@ -1,3 +1,4 @@
+
 # 第 2 章 IPC 机制 #
 ## 2.1 Android IPC 简介 ##
 IPC 是 Inter-Process Communication 的缩写，含义为进程间通讯或者跨进程通讯，是指两个进程间数据交换的过程。在 Android 上最有特色的进程间通信方式是 Binder ， 通过 Binder 可以轻松实现进程间通信。除了 Binder ，Android 还支持 Socket ，通过 Socket 可以实现任意两个端间的通信，当然，一个设备上的两个进程也可以通过 Socket 通信。由于 Android 为每个进程可分配的最大内存做了限制，所以，在单个应用中使用多进程也可以帮我们获取更多的内存资源。另外，系统提供的 ContentProvider 也是一种进程间通讯方式，只是细节被系统屏蔽了，我们无法感知。
@@ -118,3 +119,18 @@ Messager 可以翻译为信使，他可以在不同的进程中传递 Message �
 4. Map ： 只支持 HashMap ， 且里面的元素都被 AIDL 支持 ；
 5. Parcelable ： 所有实现了 Parcelable 接口的对象；
 6. AIDL ： 所有的 AIDL 接口本身也可以在 AIDL 文件中使用；
+
+**注意** 
+
+1. 自定义的 Parcelable 对象和 AIDL 对象必须要显示 import 进来，不来它们是否和当前 AIDL 在一个包中；
+2. 如果 AIDL 使用了自定义的 Parcelable 对象，那么必须新建一个和它同名的 AIDL 文件，并在其中声明它是 Parcelable 类型，例如声明一个 Book.aidl ：
+
+		package xxx ;
+		parcelable Book ;
+3. AIDL 中除了基本数据类型，其它类型参数必须标上方向： in 、 out 或 inout ，in 表示输入型参数，out 表示输出型参数，inout 表示输入输出型参数；我们不能一概使用 out 或 inout ，要根据实际需求选择合适的类型，因为这在底层是有开销的；
+4. AIDL 中只支持方法，不支持声明静态常量；
+
+未完待续
+
+### 2.4.5 使用 ContentProvider ###
+ContentProvider 是 Android 中提供的专门用于不同应用间进行数据共享的方式，从这点来看，它天生适合进程间通信。和 Messenger 一样，ContentProvider 的底层实现同样也是 Binder 。
