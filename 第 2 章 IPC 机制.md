@@ -133,4 +133,44 @@ Messager 可以翻译为信使，他可以在不同的进程中传递 Message �
 未完待续
 
 ### 2.4.5 使用 ContentProvider ###
-ContentProvider 是 Android 中提供的专门用于不同应用间进行数据共享的方式，从这点来看，它天生适合进程间通信。和 Messenger 一样，ContentProvider 的底层实现同样也是 Binder 。
+ContentProvider 是 Android 中提供的专门用于不同应用间进行数据共享的方式，从这点来看，它天生适合进程间通信。和 Messenger 一样，ContentProvider 的底层实现同样也是 Binder 。自定义 ContentProvider 很简单，只需要继承 ContentProvider 并实现 6 个抽象方法： onCreate 、 query 、 update 、 insert 、 delete 和 getType() 即可； onCreate 代表 ContentProvider 的创建，一般做些初始化的工作，并由系统回调运行在主线程中，其它 5 个由外界回调并运行在 Binder 线程池中； getType 用来返回一个 Uri 请求所对应的 MIME 类型，我们无需关注这个类型可直接返回 null 或 “*/*” ； 另外 ContentProvider 以表格的形式来组织数据，并且可以包含多个表。
+
+自定义 ContentProvider 的在 AndroidManifest.xml 中的声明如下：
+
+	<provider
+		android.name=".provider.YourCustomProvider"
+		android.authorities="packagePath.YourCustomProvider"
+		android.permission="com.myProvider.ReadAndWrite"
+		// android.readPermission="com.myProvider.Read"
+		// android.writePermission="com.myProvider.Write"
+		android.process=".provider"
+	> 
+	</provider>
+
+其中 android.authorities 是这个自定义 ContentProvider 的唯一标识，通过这个属性外部应用就可以访问我们的 ContentProvider ，因此必须是唯一的，这里建议命名的时候加上包名。另外我们还为这个 ContentProvider 自定义了读写权限，当外部应用访问时就需要申声明 "com.myProvider.ReadAndWrite" 这个权限，否则外界应用会异常终止（内部需要声明吗？）； ContentProvider 的权限还可以细分为 读 和 写 的权限，如上面注释。接下来我们就可以用 ContentResolver 访问它了，代码如下：
+
+	public class xxx extends Activity{
+		
+		...
+
+		Uri uri = Uri.parse("content://packagePath.YourCustomProvider") ;
+		getContentResolver().query(uri , null , null , null , null) ;
+
+		...
+
+	}
+
+需要注意的是 ContentProvider 的 query 、 update 、 insert 和 delete 方法是可以并发的，所以在多线程使用时，要注意线程的同步；当数据被改变是我们可以通过 ContentProvider 的 notifyChange 方法来通知外界此 ContentProvider 的数据已改变；我们还可以用 registerContentObserver 方法给 ContentProvider 注册一个数据改变监听器来监听，当不需要继续监听时用 unregisterContentObserver 来解除监听。另外，ContentProvider 除了支持增删改查外还支持自定义调用，这个过程是通过 ContentProvider 的 Call 方法和 ContentResolver 的 Call 方法来完成的。
+### 2.4.6 使用 Socket ###
+Socket 被称为 “套接字”，是网络通信中的概念，它分为 流式套接字 和 用户数据包套接字 两种，分别对应于网络的传输控制层中的 TCP 和 UDP 协议。 TCP 协议是面向连接的协议，提供稳定的双向通信功能， TCP 连接的建立需要经过 “三次握手” 才能完成，为了提供稳定的数据传输功能，其本身提供了超时重传机制，因此具有很高的稳定性；而 UDP 是无连接的，提供不稳定的单向通信功能，当然 UDP 也可以实现双向通信功能。在性能上，UDP 具有很好的效率，其缺点是不能保证数据一定能够正确传输，尤其是网络拥塞的情况下。
+## 2.5 Binder 连接池 ###
+未完待续
+## 2.6 选用合适的 IPC 方式 ###
+（名称 ： 优点 ； 缺点 ； 适用场景 ；）
+
+1. Bundle ： 简单易用；只能传输 Bundle 支持的数据类型；四大组件间的进程间通信；
+2. 文件共享 ： 简单易用；不适合高并发场景，并且无法做到进程间的即时通信；无并发访问情形，交换简单的数据，实时性不高的场景；
+3. AIDL ： 功能强大，支持一对多并发通信，支持实时通信；使用复杂，需要处理好线程同步；一对多通信且有 RPC 需求；
+4. Messenger ： 功能一般，支持一对多串行通信，支持实时通信；不能很好处理高并发情形，不支持 RPC ，数据通过 Message 进行传输，因此只能传输 Bundle 支持的数据类型；低并发的一对多即时通讯，无 RPC 需求，或者无须要返回结果的 RPC 需求；
+5. ContentProvider ： 在数据源访问方面功能强大，支持一对多并发数据共享，可通过 Call 方法扩展其它操作；可以理解为受约束的 AIDL ，主要提供数据源的 CRUD 操作；一对多的进程间的数据共享；
+6. Socket ： 功能强大，可以通过网络传输字节流，支持一对多并发实时通信；实现细节稍微有点繁琐，不支持直接的 RPC ； 网络数据交换；
