@@ -15,3 +15,17 @@ View 的位置主要由四个顶点决定，分别对应于 View 的四个属性
 	y = top + translationY ;
 **注意**在 View 平移过程中 top ， left ，right ，bottom 不会改变，变的是 x 、 y 、 translationX 和 translationY 。
 ### 3.1.3 MotionEvent 和 TouchSlop ###
+#### 3.1.3.1 MotionEvent ####
+手指接触到屏幕的一系列事件中，典型的有如下几种：
+
+1. ACTION_DOWN 手指刚接触屏幕；
+2. ACTION_MOVE 手指在屏幕上移动；
+3. ACTION_UP 手指从屏幕松开的一瞬间；
+
+正常情况下，一次手指触摸屏幕的行为会触法一系列点击事件，例如下面几种情况：
+
+1. 点击屏幕后离开松开，事件序列为 DOWN -> UP ;
+2. 点击屏幕滑动一会再松开，事件序列为 DOWN -> MOVE -> ... -> MOVE -> UP ;
+
+触摸时我们可以根据 MotionEvent 对象获得点击事件发生的 x ，y 坐标，系统提供了两组方法： getX / getY 和 getRawX / getRawY , getX / getY 返回的是相对于当前 View 左上角的 x ，y 坐标，getX / getY 返回的是相对于屏幕左上角的 x ，y 坐标。
+#### 3.1.3.2 TouchSlop ####
