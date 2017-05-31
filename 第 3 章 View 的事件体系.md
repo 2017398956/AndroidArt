@@ -27,7 +27,7 @@ View 的位置主要由四个顶点决定，分别对应于 View 的四个属性
 1. 点击屏幕后离开松开，事件序列为 DOWN -> UP ;
 2. 点击屏幕滑动一会再松开，事件序列为 DOWN -> MOVE -> ... -> MOVE -> UP ;
 
-触摸时我们可以根据 MotionEvent 对象获得点击事件发生的 x ，y 坐标，系统提供了两组方法： getX / getY 和 getRawX / getRawY , getX / getY 返回的是相对于当前 View 左上角的 x ，y 坐标，getX / getY 返回的是相对于屏幕左上角的 x ，y 坐标。
+触摸时我们可以根据 MotionEvent 对象获得点击事件发生的 x ，y 坐标，系统提供了两组方法： getX / getY 和 getRawX / getRawY , getX / getY 返回的是相对于当前 View 左上角的 x ，y 坐标，getRawX / getRawY 返回的是相对于屏幕左上角的 x ，y 坐标。
 #### 3.1.3.2 TouchSlop ####
 TouchSlop 系统所能识别出的被认为是滑动的最小距离，这是一个常量，和设备有关，不同的设备可能取值不同，可以通过 ViewConfiguration.get(getContext()).getScaledTouchSlop() 获得。
 ### 3.1.4 VelocityTracker 、 GestureDetector 和 Scroller ###
