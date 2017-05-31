@@ -55,4 +55,6 @@ TouchSlop 系统所能识别出的被认为是滑动的最小距离，这是一�
 #### 3.1.4.3 Scroller ####
 弹性滑动对象，用于实现 View 的弹性滑动。
 ## 3.2 View 的滑动 ##
-
+### 3.2.1 使用 scrollTo / scrollBy ###
+scrollBy 实际上也是调用了 scrollTo 方法，它实现了基于当前位置的相对滑动，而 scrollTo 则实现了基于所传递参数的绝对滑动。View 内部有 2 个属性 mScrollX 和 mScrollY ，可分别通过 getScrollX 和 getScrollY 获得。在滑动过程中 mScrollX 的值总是等于 View 左边缘和 View 内容左边缘在水平方向的距离，而 mSrollY 的值总是等于 View 上边缘和 View 内容上边缘在竖直方向的距离。View 边缘指的是 View 的位置，由四个顶点组成，而 View 内容边缘是指 View 中的内容的边缘，scrollTo 和 scrollBy 只能改变 View 内容的位置而不能改变 View 在布局中的位置。mScrollX 和 mScrollY 的单位是像素，正负代表 View 内容移动的方向，右下为正，左上为负。
+### 3.2.2 使用动画 ###
