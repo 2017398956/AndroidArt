@@ -58,3 +58,14 @@ TouchSlop 系统所能识别出的被认为是滑动的最小距离，这是一�
 ### 3.2.1 使用 scrollTo / scrollBy ###
 scrollBy 实际上也是调用了 scrollTo 方法，它实现了基于当前位置的相对滑动，而 scrollTo 则实现了基于所传递参数的绝对滑动。View 内部有 2 个属性 mScrollX 和 mScrollY ，可分别通过 getScrollX 和 getScrollY 获得。在滑动过程中 mScrollX 的值总是等于 View 左边缘和 View 内容左边缘在水平方向的距离，而 mSrollY 的值总是等于 View 上边缘和 View 内容上边缘在竖直方向的距离。View 边缘指的是 View 的位置，由四个顶点组成，而 View 内容边缘是指 View 中的内容的边缘，scrollTo 和 scrollBy 只能改变 View 内容的位置而不能改变 View 在布局中的位置。mScrollX 和 mScrollY 的单位是像素，正负代表 View 内容移动的方向，右下为正，左上为负。
 ### 3.2.2 使用动画 ###
+通过动画我们能让一个 View 进行平移，而平移是一种滑动。使用动画来移动 View ，主要是操作 View 的 translationX 和 translationY 属性，既可以采用传统的 View 动画，也可以采用属性动画，如果采用属性动画的话，为了能兼容 3.0 以下的版本，需要采用开源动画库 nineoldandroids （http://nineoldandroids.com/)
+View 动画是对 View 的影像做操作，它不能真正改变 View 的位置参数，包括宽/高，并且如果希望动画后的状态得以保留还必须将 fillAfter 属性设置为 true ，否则动画完成后期动画结果会消失。使用属性动画则不为存在这种问题，但是在 Android 3.0 以下无法使用属性动画，这个时候我们可以使用动画兼容库 nineoldandroids 来实现属性动画，尽管如此，在 Android 3.0 以下的手机上通过 nineoldandroids 来实现的属性动画本质上仍然是 View 动画。
+**注意**：由于 View 动画无法真正改变 View 的位置，当 View 移动后会造成在新位置无法触发 onClick 等事件。
+### 3.2.3 改变布局参数 ###
+对于 View 的滑动，我们还可以通过 LayoutParams 的 margin 、 width 等来达到移动 View 的效果。
+### 3.2.4 各种滑动方式的对比 ###
+
+| - | scrollTo / scrollBy | 动画 | 改变布局参数 |
+|------|---------------------| ---- |------------|
+| 优点 | 操作简单，不影响内部元素的点击事件 | 动画 | 改变布局参数 |
+| 缺点 | 只能滑动 View 内容，不能滑动 View 本身 | 动画 | 改变布局参数 |
