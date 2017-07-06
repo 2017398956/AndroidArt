@@ -123,3 +123,104 @@ Window 的添加过程需要通过 WindowManager 的 addView 来实现，WindowM
 	}
 
 接着会通过 WindowSession 最终来完成 Window 的添加过程。在下面的代码中， mWindowSession 的类型是 IWindowSession ，它是一个 Binder 对象，真正的实现类是 Session ，也就是 Window 的添加过程是一次 IPC 调用 。
+
+	try{
+		mOrigWindowType = mWindowAttributes.type ;
+		mAttachInfo.mRecomputeGlobalAttributes = true ;
+		collectViewAttributes() ;
+		res = mWindowSession.addToDisplay(mWindow , mSeq , mWindowAttributes , getHostVisibility() , mDisplay.getDisplayId() ,
+			mAttachInfo.mContentInsets , mInputChannel) ;
+	}catch(RemoteException e){
+		mAdded = false ;
+		mView = null ;
+		mAttachInfo.mRootView = null ;
+		mInputChannel = null ;
+		mFallbackEventHandler.setView(null) ;
+		unsheduleTraversals() ;
+		setAccessibilityFocus(null , null) ;
+		throw new RuntimeException("Adding window failed" , e ) ;
+	}
+
+在 Session 内部会通过 WindowManagerService 来实现 Window 的添加，代码如下：
+
+	public int addToDisplay(IWindow window , int seq , 	WindowManager.LayoutParams attrs , int viewVisbility , int displayId ,Rect outContentInsets , InputChannel outInputChannel){
+		return mService.addWindow(this , window , seq , attrs , viewVisbility , displayId , outConntentInsets , outInputChannel) ;
+	}
+
+如此一来，Window 的添加请求就交给 WindowManagerService 去处理了，在 WindowManagerService 内部会为每一个应用保留一个单独的 Session 。
+
+### 8.2.2 Window 的删除过程 ###
+
+Window 的删除过程和添加过程一样，都是先通过 WindowManagerImpl 后，再进一步通过 WindowManagerGlobal 来实现的。代码如下：
+
+    public void removeView(View view, boolean immediate) {
+        if (view == null) {
+            throw new IllegalArgumentException("view must not be null");
+        }
+
+        synchronized (mLock) {
+            int index = findViewLocked(view, true);
+            View curView = mRoots.get(index).getView();
+            removeViewLocked(index, immediate);
+            if (curView == view) {
+                return;
+            }
+
+            throw new IllegalStateException("Calling with view " + view
+                    	+ " but the ViewAncestor is attached to " + curView);
+        }
+    }
+
+removeView 的逻辑很清晰，首先通过 findViewLocked 来查找待删除的 View 的索引，这个查找过程就是建立的数组遍历，然后在调用 removeViewLocked 来做进一步删除，代码如下：
+
+    private void removeViewLocked(int index, boolean immediate) {
+        ViewRootImpl root = mRoots.get(index);
+        View view = root.getView();
+
+        if (view != null) {
+            InputMethodManager imm = InputMethodManager.getInstance();
+            if (imm != null) {
+                imm.windowDismissed(mViews.get(index).getWindowToken());
+            }
+        }
+        boolean deferred = root.die(immediate);
+        if (view != null) {
+            view.assignParent(null);
+            if (deferred) {
+                mDyingViews.add(view);
+            }
+        }
+    }
+
+removeViewLocked 是通过 ViewRootImpl 来完成删除操作的。在 WindowManager 中提供了两种删除接口 removeView 和 removeViewImmediate ，它们分别表示异步删除和同步删除。其中 removeViewImmediate 使用时要特别注意，一般不需要使用该方法来删除 Window 以免发生意外错误。而 removeView 的具体删除操作是由 ViewRootImpl 的 die 方法来完成；在异步删除的情况下，die 方法只是发送了一个请求删除的消息就立刻返回了，这时 View 并没有完成删除造作，所以最后会将其添加到 mDyingViews 中，mDyingViews 表示待删除的 View 列表。 ViewRootImpl 的 die 方法如下：
+
+    /**
+     	* @param immediate True, do now if not in traversal. False, put on queue and do later.
+     	* @return True, request has been queued. False, request has been completed.
+     */
+    boolean die(boolean immediate) {
+        // Make sure we do execute immediately if we are in the middle of a traversal or the damage
+        // done by dispatchDetachedFromWindow will cause havoc on return.
+        if (immediate && !mIsInTraversal) {
+            doDie();
+            return false;
+        }
+
+        if (!mIsDrawing) {
+            destroyHardwareRenderer();
+        } else {
+            Log.e(mTag, "Attempting to destroy the window while drawing!\n" +
+                    "  window=" + this + ", title=" + mWindowAttributes.getTitle());
+        }
+        mHandler.sendEmptyMessage(MSG_DIE);
+        return true;
+    }
+
+在 die 方法内部只是做了简单的判断，如果是异步删除，那么就发送一个 MSG_DIE 的消息，ViewRootImpl 中的 Handler 会处理此消息并调用 doDie 方法，如果是同步删除（立即删除）那么就不发送消息直接调用 doDie 方法，这就是两种删除方式的区别。在 doDie 内部会调用 dispatchDetachedFromWindow 方法，真正的删除 View 的逻辑在 dispatchDetachedFromWindow 方法的内部实现。dispatchDetachedFromWindow 方法主要做四件事：
+
+1. 垃圾回收的相关工作，比如清除数据和消息、移除回调。
+2. 通过 Session 的 remove 方法删除 Window ： mWindowSession.remove(mWindow) ,这同样是一个 IPC 过程，最终会调用 WindowManagerService 的 removeWindow 方法。
+3. 调用 View 的 dispatchDetachedFromWindow 方法，在内部会调用 View 的onDetachedFromWindow 以及 onDetachedFromWindowInternal 。onDetachedFromWindow 方法会在 View 被删除时调用，并做一些资源回收的工作，比如终止动画，停止线程等。
+4. 调用 WindowManagerGlobal 的 doRemoveView 方法刷新数据，包括 mRoots 、 mParams 、 以及 mDyingViews ，需要将当前 Window 所关联的这三类对象从列表中删除。
+
+### 8.2.3 Window 的更新过程 ###
