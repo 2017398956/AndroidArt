@@ -224,3 +224,86 @@ removeViewLocked 是通过 ViewRootImpl 来完成删除操作的。在 WindowMan
 4. 调用 WindowManagerGlobal 的 doRemoveView 方法刷新数据，包括 mRoots 、 mParams 、 以及 mDyingViews ，需要将当前 Window 所关联的这三类对象从列表中删除。
 
 ### 8.2.3 Window 的更新过程 ###
+
+Window 的更新方法为 WindowManagerGlobal 中的 updateViewLayout ,代码如下：
+
+    public void updateViewLayout(View view, ViewGroup.LayoutParams params) {
+        if (view == null) {
+            throw new IllegalArgumentException("view must not be null");
+        }
+        if (!(params instanceof WindowManager.LayoutParams)) {
+            throw new IllegalArgumentException("Params must be WindowManager.LayoutParams");
+        }
+
+        final WindowManager.LayoutParams wparams = (WindowManager.LayoutParams)params;
+
+        view.setLayoutParams(wparams);
+
+        synchronized (mLock) {
+            int index = findViewLocked(view, true);
+            ViewRootImpl root = mRoots.get(index);
+            mParams.remove(index);
+            mParams.add(index, wparams);
+            root.setLayoutParams(wparams, false);
+        }
+    }
+
+updateViewLayout 做的事情比较少，首先它需要更新 View 的 LayoutParams 并替换掉老的 LayoutParams ，接着更新 ViewRootImpl 中的 LayoutParams ，这一步是通过 ViewRootImpl 的 setLayoutParams 方法来实现的。在 ViewRootImpl 中会通过 scheduleTraversals 方法对 View 重新布局，包括测量、布局、重绘这三个过程。除了 View 本身的重绘外 ，ViewRootImpl 还通过 WindowSession 来更新 Window 的视图，这个过程最终是由 WindowManagerService 的 relayoutWindow() 来具体实现的，它同样是一个 IPC 过程。
+
+## 8.3 Window 的创建过程 ##
+
+通过上面的分析可以看出，View 是 Android 中的视图的呈现方式，但是 View 不能单独存在，
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
