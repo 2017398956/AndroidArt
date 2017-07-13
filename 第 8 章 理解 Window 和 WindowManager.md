@@ -252,7 +252,36 @@ updateViewLayout 做的事情比较少，首先它需要更新 View 的 LayoutPa
 
 ## 8.3 Window 的创建过程 ##
 
-通过上面的分析可以看出，View 是 Android 中的视图的呈现方式，但是 View 不能单独存在，
+通过上面的分析可以看出，View 是 Android 中的视图的呈现方式，但是 View 不能单独存在，它必须依附在 Window 这个抽象概念上，因此有视图的的地方就有 Window ，例如： Activity ，Dialog ，Toast 等视图都对应一个 Window 。
+
+### 8.3.1 Activity 的 Window 创建过程 ###
+
+要分析 Activity 中的 Window 的创建过程就必须了解 Activity 的启动过程，Activity 的启动过程十分复杂，这里只需要知道最终会由 ActivityThread 中的 performLaunchActivity 来完成整个启动过程，在这个方法内部会通过类加载器创建 Activity 的实例对象，并调用其 attach 方法为其关联运行过程中所依赖的一系列上下文环境变量，代码如下：
+
+	java.lang.ClassLoader cl = r.packageInfo.getClassLoader();
+	activity = mInstrumentation.newActivity(cl, component.getClassName(), r.intent);
+	...
+	if (activity != null) {
+		Context appContext = createBaseContextForActivity(r, activity);
+		CharSequence title = r.activityInfo.loadLabel(appContext.getPackageManager());
+		Configuration config = new Configuration(mCompatConfiguration);
+		if (r.overrideConfig != null) {
+        	config.updateFrom(r.overrideConfig);
+        }
+        if (DEBUG_CONFIGURATION) Slog.v(TAG, "Launching activity " + r.activityInfo.name + " with config " + config);
+		Window window = null;
+		if (r.mPendingRemoveWindow != null && r.mPreserveWindow) {
+        	window = r.mPendingRemoveWindow;
+          	r.mPendingRemoveWindow = null;
+			r.mPendingRemoveWindowManager = null;
+		}
+		activity.attach(appContext, this, getInstrumentation(), r.token,
+                        r.ident, app, r.intent, r.activityInfo, title, r.parent,
+                        r.embeddedID, r.lastNonConfigurationInstances, config,
+                        r.referrer, r.voiceInteractor, window);
+	...
+
+在 Activity 的 attach 方法里，系统会创建 Activity 所属的 Window 对象并为其设置回调接口，Window 对象的创建是通过 PolicyManager 的 makeNewWindow 方法实现的。
 
 
 
