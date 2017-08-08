@@ -281,7 +281,7 @@ updateViewLayout 做的事情比较少，首先它需要更新 View 的 LayoutPa
                         r.referrer, r.voiceInteractor, window);
 	...
 
-在 Activity 的 attach 方法里，系统会创建 Activity 所属的 Window 对象并为其设置回调接口，Window 对象的创建是通过 PolicyManager 的 makeNewWindow 方法实现的。
+在 Activity 的 attach 方法里，系统会创建 Activity 所属的 Window 对象并为其设置回调接口，Window 对象的创建是通过 PolicyManager 的 makeNewWindow 方法实现的。由于 Activity 实现了 Window 的 Callback 接口，因此当 Window 接收到外界的状态改变时就会回调 Activity 的方法。
 
 
 
