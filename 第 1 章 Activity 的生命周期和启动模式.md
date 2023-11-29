@@ -1,13 +1,15 @@
 # 第 1 章 Activity 的生命周期和启动模式 #
 ## 1.1 Activity 生命周期的全面分析 ##
 ### 1.1.1 典型情况下的生命周期分析 ###
-1. onCreate : 生命周期第一个方法，可做一些初始化工作；
-2. onRestart ： Activity 重新启动，由不可见变为可见；
-3. onStart ： Activity 正在启动，此时 Activity 已经可见，但没有出现在前台，还无法和用户交互；
-4. onResume ： Activity 可见，出现在前台，并开始活动；
-5. onPause ： Activity 正在停止，正常情况下 onStop 会紧接着被调用，但是该方法中不宜做耗时操作，因为当该方法执行完毕后，新 Activity 的 onResume 方法才会执行；打开新的 Activity 时，当前 Activity 的 onPause 方法先执行完毕，新 Activity 的 onCreate 方法才会执行 ；
-6. onStop ： Activity 即将停止，可以做一些耗时操作，但不能太耗时；
-7. onDestroy ： Activity 即将被销毁，这是 Activity 生命周期中最后一个回调，在这里我们可以做一些回收工作和资源释放；
+1. onCreate : 生命周期第一个方法，可做一些初始化工作；如果该方法中有耗时操作会造成黑屏现象（好像 App 卡死了），黑屏前的 Acitivity 触摸无反应，特别时用户通过 home 键回到桌面再通过图标进入时会有段时间无任何响应；
+2. onRestart ： Activity 重新启动，由不可见变为可见；耗时操作效果同上；
+3. onStart ： Activity 正在启动，此时 Activity 已经可见，但没有出现在前台，还无法和用户交互；耗时操作效果同上；
+4. onResume ： Activity 可见，出现在前台，并开始活动（View 还未绘制完毕，当触发 onWindowFocusChanged 时，Acitivity 获得焦点，此时 View 绘制完毕可以进行交互或获取 View 宽高等信息）；耗时操作效果同上；
+5. onPause ： Activity 正在停止，正常情况下 onStop 会紧接着被调用，但是该方法中不宜做耗时操作，因为当该方法执行完毕后，新 Activity 的 onResume 方法（测试的结果是 onCreate 方法才会执行）才会执行；打开新的 Activity 时，当前 Activity 的 onPause 方法先执行完毕，新 Activity 的 onCreate 方法才会执行 ；
+6. onStop ： Activity 即将停止，可以做一些耗时操作，但不能太耗时；当太耗时，用户从跳转后的 Activity 再次返回到该 Activity 时，有可能触发 Appliction is not responding. 系统弹窗（回到该Activity 后 5000ms 没有执行完毕），另外当用户是先按 home 键返回桌面再通过历史列表中回来时会造成该 Activity 触摸无反应（onStop 还未执行完毕） ；
+7. onDestroy ： Activity 即将被销毁，这是 Activity 生命周期中最后一个回调，在这里我们可以做一些回收工作和资源释放；这个方法也不能做太耗时的操作，例如：用户从 AActivity->BActivity->CActivity ,当用户从 CActivity 连续回退到 BActivity 后 CActivity 的 onDestroy 还需要 5000ms 以上才能结束，此时用户回退到 Activity 或 进行其它触摸操作均会触发 ANR ，5000ms 以内时触摸 BActivity 上的控件不能及时触发效果，产生卡顿感；
+
+所以：Activity 的生命周期函数都不能做太耗时的操作，只是 onStop 和 onDestroy 相对做更耗时的操作。
 
 **注意**
 当用户打开新的 Activity 或者切换到桌面的时候，回调如下： onPause -> onStop ，这里有一种特殊的情况，如果新的 Activity 采用了透明主题或 Dialog 主题，那么当前的 Activity 不会回调 onStop 。
@@ -24,10 +26,13 @@
 
 当系统内存不足时，系统会按照上述优先级去杀死目标 Activity 所在的进程，并在后续通过 onSaveInstanceState 和 onRestoreInstanceState 来保存和恢复数据；如果一个进程中没有四大组件在运行，那么这个进程很容易被杀死。
 ## 1.2 Activity 的启动模式 ##
-1. standard : 标准模式。即系统默认模式，每次启动 Activity 时都会重新创建一个该 Activity 的实例，无论之前是否创建过。 Activity 只能在任务栈中创建，由于 ApplicationContext 不在任务栈中，所以当我们直接用 ApplicationContext 启动一个 Activity 时，总是会报异常，此时需要为待启动的 Activity 指定 FLAG_ACTIVITY_NEW_TASK 标记位，这样启动的时候就会为它创建一个任务栈，当任务栈中没有 Activity 时，系统就会回收任务栈，通过这种方式启动的 Activity 其启动模式为 singleTask ；（在该任务栈多次启动该 Activity 试试？）
-2. singleTop : 栈顶复用模式。如果新 Activity 已经位于任务栈的栈顶，那么此时 Activity 不会重新被创建，同时它的 onNewIntent 方法会被调用，通过此方法的参数我们可以取出当前的请求信息。
-3. singleTask : 栈内复用模式。如果任一栈内已有该 Activity 的实例，那么系统会将该 Activity 放到栈顶（即，移除该栈中此 Activity 上所有的 Activity，如栈内有 ADBC 四个 Activity ，当再次启动 Activity D 时，BC 都会出栈，此时 BC 的生命周期？ ），并调用它的 onNewIntent 方法，通过此方法的参数我们可以取出当前的请求信息。
-4. singleInstance ： 单实例模式。这是一种加强的 singleTask 模式，具备 singleTask 的所有特性，另外此模式的 Activity 只能单独位于一个任务栈中。（此 Activity 再启动其他 Activity ，这两个 Activity 不在一个栈中？）
+1. standard : 标准模式。即系统默认模式，每次启动 Activity 时都会重新创建一个该 Activity 的实例，无论之前是否创建过。 Activity 只能在任务栈中创建，由于 ApplicationContext 不在任务栈中，所以当我们直接用 ApplicationContext 启动一个 Activity 时，总是会报异常，此时需要为待启动的 Activity 指定 FLAG_ACTIVITY_NEW_TASK 标记位，这样启动的时候就会为它创建一个任务栈，当任务栈中没有 Activity 时，系统就会回收任务栈，通过这种方式启动的 Activity 其启动模式为 singleTask ；（在该任务栈多次启动该 Activity 试试？经测试通过这个标记启动的 Activity 如果没有指定任务栈，则它的栈还是在主任务栈即包名任务栈；另外，指定任务栈名后，每个任务栈在 app 历史栏上单独显示）
+2. singleTop : 栈顶复用模式。如果新 Activity 已经位于任务栈的栈顶，那么此时 Activity 不会重新被创建，同时它的 onNewIntent 方法会被调用，通过此方法的参数我们可以取出当前的请求信息（当使用 singleTop 时 app 历史栏只有当前一个记录，无论是否该 Activity 在不在包名栈）。
+3. singleTask : 栈内复用模式。如果任一栈内已有该 Activity 的实例，那么系统会将该 Activity 放到栈顶（即，移除该栈中此 Activity 上所有的 Activity，如栈内有 ADBC 四个 Activity ，当再次启动 Activity D 时，BC 都会出栈，此时 BC 的生命周期？ ），并调用它的 onNewIntent 方法，通过此方法的参数我们可以取出当前的请求信息（效果同 FLAG_ACTIVITY_NEW_TASK ）。
+4. singleInstance ： 单实例模式。这是一种加强的 singleTask 模式，具备 singleTask 的所有特性，另外此模式的 Activity 只能单独位于一个任务栈中（此 Activity 再启动其他 Activity ，这两个 Activity 不在一个栈中？指定不同于包名栈的栈名后，会在 app 历史栏中单独显示）。
+
+
+注意：singleTask 与 singleInstance 的差别，下面举例说明。假设 AActivity 与 BActivity 的启动模式都是 singleTask 栈名都设置为 “test” 则依次启动 主界面->A->B->A ,当回退时会直接回退到 主界面 ；如果设置为 singleInstance 回退时的顺序为 B—> 主界面，虽然设置了同一个栈名，但是 singleInstance 没有 clearTop 的作用。
 
 配置 Activity 的启动模式一般有一下两个方法：
 
