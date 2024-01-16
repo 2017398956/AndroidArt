@@ -124,7 +124,7 @@ private void performTraversals() {
 
 ### 4.1.2 执行 performTraveals 方法
 
-ViewRootImpl 中有一个 scheduleTraversals 方法，在 ViewRootImpl 调用 setLayout、invalidate、setLayoutParams 等一系列方法时都会调用 scheduleTraversals 方法。代码如下：
+ViewRootImpl 中有一个 scheduleTraversals 方法，在 ViewRootImpl 调用 setView、setLayout、invalidate、setLayoutParams 等一系列方法时都会调用 scheduleTraversals 方法。代码如下：
 
 ```java
 void scheduleTraversals() {
